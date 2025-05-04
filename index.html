@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MazeBegins</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .cell {
+            width: 12px;
+            height: 12px;
+            box-sizing: border-box;
+            transition: all 0.2s ease;
+        }
+        .wall {
+            background-color: #1e293b;
+            box-shadow: inset 0 0 3px rgba(0, 0, 0, 0.3);
+        }
+        .path {
+            background-color: #f8fafc;
+        }
+        .player {
+            background-color: #3b82f6;
+            border-radius: 2px;
+            box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.5);
+            transform: scale(0.9);
+            animation: playerPulse 1s infinite alternate;
+        }
+        .goal {
+            background-color: #10b981;
+            border-radius: 2px;
+            animation: goalPulse 1.5s infinite;
+        }
+        .visited {
+            background-color: rgba(147, 197, 253, 0.3);
+            transition: background-color 0.5s ease;
+        }
+        @keyframes playerPulse {
+            0% { transform: scale(0.9); }
+            100% { transform: scale(1); }
+        }
+        @keyframes goalPulse {
+            0% { transform: scale(0.95); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(0.95); }
+        }
+        #maze-container {
+            box-shadow: 0 5px 10px -3px rgba(0, 0, 0, 0.1);
+            border: 2px solid #1e293b;
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .slide-in {
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .stats-item {
+            transition: all 0.3s ease;
+        }
+        .stats-item:hover {
+            transform: translateY(-3px);
+        }
+
+        .message {
+            display: none;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+        }
+        h1 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        p {
+            color: #666;
+            font-size: 16px;
+            margin: 0;
+        }
+        @media (max-width: 768px) {
+            .message {
+                display: block;
+                margin: 10px;
+                padding: 15px;
+            }
+            h1 {
+                font-size: 20px;
+            }
+            p {
+                font-size: 14px;
+            }
+        }
+
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-100 to-slate-200 min-h-screen flex flex-col items-center justify-center p-4">
+    <div class="text-center mb-4 slide-in">
+        <h1 class="text-3xl font-bold text-slate-800 mb-2">MazeBegins</h1>
+        <p class="text-slate-600">Navigate through the labyrinth with keyboard</p>
+    </div>
+
+    <div class="flex flex-col sm:flex-row gap-4 w-full max-w-4xl">
+        <!-- Stats Panel -->
+        <div class="bg-white p-4 rounded-xl shadow-lg w-full sm:w-32 h-fit fade-in">
+            <div class="stats-item mb-3">
+                <p class="text-xs text-slate-500"><i class="fas fa-shoe-prints mr-1"></i> Moves</p>
+                <p id="move-count" class="text-xl font-bold text-blue-600">0</p>
+            </div>
+            <div class="stats-item mb-3">
+                <p class="text-xs text-slate-500"><i class="fas fa-map-marked-alt mr-1"></i> Visited</p>
+                <p id="visited-count" class="text-xl font-bold text-blue-600">0</p>
+            </div>
+            <div class="stats-item">
+                <p class="text-xs text-slate-500"><i class="fas fa-clock mr-1"></i> Time</p>
+                <p id="time-count" class="text-xl font-bold text-blue-600">0s</p>
+            </div>
+        </div>
+
+        <!-- Maze Panel -->
+        <div class="bg-white p-4 rounded-xl shadow-xl w-full fade-in">
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-3">
+                <div class="flex flex-wrap items-center gap-3">
+                    <div>
+                        <span class="font-semibold text-slate-700 text-sm"><i class="fas fa-ruler-combined mr-1"></i> Size:</span>
+                        <select id="maze-size" class="ml-1 px-2 py-1 border rounded-lg bg-white text-slate-700 text-sm">
+                            <option value="15">Small (15x15)</option>
+                            <option value="25">Medium (25x25)</option>
+                            <option value="35" selected>Large (35x35)</option>
+                        </select>
+                    </div>
+                </div>
+                <button id="new-maze" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg transition-all flex items-center gap-1 shadow-md text-sm">
+                    <i class="fas fa-sync-alt"></i>
+                    New Maze
+                </button>
+            </div>
+
+            <div class="flex justify-center mb-3">
+                <div id="maze-container" class="mx-auto"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="win-message" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-xl shadow-2xl text-center max-w-md w-full mx-4 transform transition-all duration-300 scale-95 opacity-0" id="win-box">
+            <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-trophy text-green-500 text-3xl"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-green-600 mb-2">Maze Solved!</h2>
+            <p class="text-slate-600 mb-4">Congratulations on reaching the exit!</p>
+            
+            <div class="grid grid-cols-2 gap-3 my-4">
+                <div class="bg-blue-50 p-2 rounded-lg">
+                    <p class="text-sm text-slate-500">Moves</p>
+                    <p id="win-moves" class="text-lg font-bold text-slate-700">0</p>
+                </div>
+                <div class="bg-blue-50 p-2 rounded-lg">
+                    <p class="text-sm text-slate-500">Time</p>
+                    <p id="win-time" class="text-lg font-bold text-slate-700">0s</p>
+                </div>
+                <div class="bg-blue-50 p-2 rounded-lg">
+                    <p class="text-sm text-slate-500">Visited</p>
+                    <p id="win-visited" class="text-lg font-bold text-slate-700">0</p>
+                </div>
+                <div class="bg-blue-50 p-2 rounded-lg">
+                    <p class="text-sm text-slate-500">Efficiency</p>
+                    <p id="win-efficiency" class="text-lg font-bold text-slate-700">0%</p>
+                </div>
+            </div>
+            
+            <div class="flex gap-2">
+                <button id="play-again" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition flex-1 flex items-center justify-center gap-2">
+                    <i class="fas fa-redo"></i>
+                    Play Again
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Game configuration
+            const config = {
+                rows: 35,
+                cols: 35,
+                cellSize: 12,
+                playerPos: { row: 1, col: 1 },
+                goalPos: { row: 33, col: 33 },
+                visitedCells: new Set(),
+                moves: 0,
+                startTime: null,
+                timer: null
+            };
+
+            // DOM elements
+            const mazeContainer = document.getElementById('maze-container');
+            const newMazeBtn = document.getElementById('new-maze');
+            const mazeSizeSelect = document.getElementById('maze-size');
+            const winMessage = document.getElementById('win-message');
+            const winBox = document.getElementById('win-box');
+            const playAgainBtn = document.getElementById('play-again');
+            const moveCount = document.getElementById('move-count');
+            const visitedCount = document.getElementById('visited-count');
+            const timeCount = document.getElementById('time-count');
+            const winMoves = document.getElementById('win-moves');
+            const winTime = document.getElementById('win-time');
+            const winVisited = document.getElementById('win-visited');
+            const winEfficiency = document.getElementById('win-efficiency');
+
+            // Initialize game
+            let maze = [];
+            initGame();
+
+            // Event listeners
+            newMazeBtn.addEventListener('click', initGame);
+            playAgainBtn.addEventListener('click', () => {
+                winMessage.classList.add('hidden');
+                initGame();
+            });
+            mazeSizeSelect.addEventListener('change', initGame);
+
+            // Keyboard controls (WASD and arrow keys)
+            document.addEventListener('keydown', (e) => {
+                switch(e.key.toLowerCase()) {
+                    case 'w':
+                    case 'arrowup':
+                        movePlayer(-1, 0);
+                        break;
+                    case 's':
+                    case 'arrowdown':
+                        movePlayer(1, 0);
+                        break;
+                    case 'a':
+                    case 'arrowleft':
+                        movePlayer(0, -1);
+                        break;
+                    case 'd':
+                    case 'arrowright':
+                        movePlayer(0, 1);
+                        break;
+                }
+            });
+
+            // Initialize or reset the game
+            function initGame() {
+                // Clear previous timer
+                if (config.timer) {
+                    clearInterval(config.timer);
+                }
+                
+                config.rows = parseInt(mazeSizeSelect.value);
+                config.cols = parseInt(mazeSizeSelect.value);
+                config.playerPos = { row: 1, col: 1 };
+                config.goalPos = { row: config.rows - 2, col: config.cols - 2 };
+                config.visitedCells = new Set();
+                config.moves = 0;
+                config.startTime = Date.now();
+                
+                // Start timer
+                config.timer = setInterval(updateTimer, 1000);
+                
+                generateMaze();
+                renderMaze();
+                updateStats();
+            }
+
+            // Update game stats
+            function updateStats() {
+                moveCount.textContent = config.moves;
+                visitedCount.textContent = config.visitedCells.size;
+                timeCount.textContent = Math.floor((Date.now() - config.startTime) / 1000) + 's';
+                
+                const totalCells = config.rows * config.cols;
+                const pathCells = totalCells - countWalls();
+                const efficiency = Math.floor((config.visitedCells.size / pathCells) * 100);
+                winEfficiency.textContent = efficiency + '%';
+            }
+
+            // Count walls in maze
+            function countWalls() {
+                let count = 0;
+                for (let row = 0; row < config.rows; row++) {
+                    for (let col = 0; col < config.cols; col++) {
+                        if (maze[row][col] === 1) count++;
+                    }
+                }
+                return count;
+            }
+
+            // Update timer
+            function updateTimer() {
+                timeCount.textContent = Math.floor((Date.now() - config.startTime) / 1000) + 's';
+            }
+
+            // Generate maze using Prim's algorithm for better quality
+            function generateMaze() {
+                // Initialize maze with all walls
+                maze = Array(config.rows).fill().map(() => 
+                    Array(config.cols).fill(1)
+                );
+
+                // Start from a random cell (odd row and column)
+                const startRow = 1;
+                const startCol = 1;
+                
+                // List of frontier cells
+                const frontiers = [];
+                
+                // Mark the starting cell as path
+                maze[startRow][startCol] = 0;
+                
+                // Add neighboring walls to frontier
+                addFrontiers(startRow, startCol, frontiers);
+                
+                while (frontiers.length > 0) {
+                    // Pick a random frontier cell
+                    const randomIndex = Math.floor(Math.random() * frontiers.length);
+                    const [row, col] = frontiers[randomIndex];
+                    frontiers.splice(randomIndex, 1);
+                    
+                    // Get all neighboring paths
+                    const neighbors = [];
+                    
+                    if (row > 1 && maze[row-2][col] === 0) neighbors.push([row-2, col]);
+                    if (row < config.rows-2 && maze[row+2][col] === 0) neighbors.push([row+2, col]);
+                    if (col > 1 && maze[row][col-2] === 0) neighbors.push([row, col-2]);
+                    if (col < config.cols-2 && maze[row][col+2] === 0) neighbors.push([row, col+2]);
+                    
+                    if (neighbors.length > 0) {
+                        // Connect to a random neighbor
+                        const [nRow, nCol] = neighbors[Math.floor(Math.random() * neighbors.length)];
+                        const betweenRow = (row + nRow) / 2;
+                        const betweenCol = (col + nCol) / 2;
+                        
+                        maze[row][col] = 0;
+                        maze[betweenRow][betweenCol] = 0;
+                        
+                        // Add new frontiers
+                        addFrontiers(row, col, frontiers);
+                    }
+                }
+                
+                // Ensure the goal is reachable
+                ensureGoalReachable();
+                
+                // Clean up any isolated walls
+                cleanUpWalls();
+            }
+            
+            // Add neighboring walls to frontier list
+            function addFrontiers(row, col, frontiers) {
+                if (row > 1 && maze[row-2][col] === 1) {
+                    frontiers.push([row-2, col]);
+                    maze[row-2][col] = 2; // Mark as frontier
+                }
+                if (row < config.rows-2 && maze[row+2][col] === 1) {
+                    frontiers.push([row+2, col]);
+                    maze[row+2][col] = 2;
+                }
+                if (col > 1 && maze[row][col-2] === 1) {
+                    frontiers.push([row, col-2]);
+                    maze[row][col-2] = 2;
+                }
+                if (col < config.cols-2 && maze[row][col+2] === 1) {
+                    frontiers.push([row, col+2]);
+                    maze[row][col+2] = 2;
+                }
+            }
+            
+            // Ensure the goal is reachable from the start
+            function ensureGoalReachable() {
+                // If goal is already a path, we're good
+                if (maze[config.goalPos.row][config.goalPos.col] === 0) return;
+                
+                // Find all path cells adjacent to the goal
+                const adjacentPaths = [];
+                
+                if (config.goalPos.row > 0 && maze[config.goalPos.row-1][config.goalPos.col] === 0) {
+                    adjacentPaths.push([config.goalPos.row-1, config.goalPos.col]);
+                }
+                if (config.goalPos.row < config.rows-1 && maze[config.goalPos.row+1][config.goalPos.col] === 0) {
+                    adjacentPaths.push([config.goalPos.row+1, config.goalPos.col]);
+                }
+                if (config.goalPos.col > 0 && maze[config.goalPos.row][config.goalPos.col-1] === 0) {
+                    adjacentPaths.push([config.goalPos.row, config.goalPos.col-1]);
+                }
+                if (config.goalPos.col < config.cols-1 && maze[config.goalPos.row][config.goalPos.col+1] === 0) {
+                    adjacentPaths.push([config.goalPos.row, config.goalPos.col+1]);
+                }
+                
+                // If there are adjacent paths, connect the goal to one of them
+                if (adjacentPaths.length > 0) {
+                    const [pathRow, pathCol] = adjacentPaths[Math.floor(Math.random() * adjacentPaths.length)];
+                    maze[config.goalPos.row][config.goalPos.col] = 0;
+                } else {
+                    // If no adjacent paths, make a new path to the goal
+                    if (config.goalPos.row > 0) {
+                        maze[config.goalPos.row-1][config.goalPos.col] = 0;
+                        maze[config.goalPos.row][config.goalPos.col] = 0;
+                    } else if (config.goalPos.col > 0) {
+                        maze[config.goalPos.row][config.goalPos.col-1] = 0;
+                        maze[config.goalPos.row][config.goalPos.col] = 0;
+                    }
+                }
+            }
+            
+            // Clean up any isolated walls or dead ends
+            function cleanUpWalls() {
+                for (let row = 1; row < config.rows - 1; row++) {
+                    for (let col = 1; col < config.cols - 1; col++) {
+                        // Remove isolated walls (completely surrounded by walls)
+                        if (maze[row][col] === 1) {
+                            if (maze[row-1][col] === 1 && maze[row+1][col] === 1 && 
+                                maze[row][col-1] === 1 && maze[row][col+1] === 1) {
+                                maze[row][col] = 0;
+                            }
+                        }
+                        
+                        // Remove some dead ends to make maze more interesting
+                        if (maze[row][col] === 0 && Math.random() < 0.3) {
+                            let wallCount = 0;
+                            if (maze[row-1][col] === 1) wallCount++;
+                            if (maze[row+1][col] === 1) wallCount++;
+                            if (maze[row][col-1] === 1) wallCount++;
+                            if (maze[row][col+1] === 1) wallCount++;
+                            
+                            if (wallCount >= 3) {
+                                // Randomly remove one wall to open up the dead end
+                                const directions = [];
+                                if (row > 1 && maze[row-1][col] === 1) directions.push([row-1, col]);
+                                if (row < config.rows-2 && maze[row+1][col] === 1) directions.push([row+1, col]);
+                                if (col > 1 && maze[row][col-1] === 1) directions.push([row, col-1]);
+                                if (col < config.cols-2 && maze[row][col+1] === 1) directions.push([row, col+1]);
+                                
+                                if (directions.length > 0) {
+                                    const [r, c] = directions[Math.floor(Math.random() * directions.length)];
+                                    maze[r][c] = 0;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Render the maze
+            function renderMaze() {
+                mazeContainer.innerHTML = '';
+                mazeContainer.style.width = `${config.cols * config.cellSize}px`;
+                
+                for (let row = 0; row < config.rows; row++) {
+                    const rowDiv = document.createElement('div');
+                    rowDiv.className = 'flex';
+                    
+                    for (let col = 0; col < config.cols; col++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'cell';
+                        
+                        // Set cell type
+                        if (row === config.playerPos.row && col === config.playerPos.col) {
+                            cell.classList.add('player');
+                        } else if (row === config.goalPos.row && col === config.goalPos.col) {
+                            cell.classList.add('goal');
+                        } else if (maze[row][col] === 1) {
+                            cell.classList.add('wall');
+                        } else {
+                            cell.classList.add('path');
+                            const cellKey = `${row},${col}`;
+                            if (config.visitedCells.has(cellKey)) {
+                                cell.classList.add('visited');
+                            }
+                        }
+                        
+                        rowDiv.appendChild(cell);
+                    }
+                    
+                    mazeContainer.appendChild(rowDiv);
+                }
+            }
+
+            // Move the player
+            function movePlayer(dRow, dCol) {
+                const newRow = config.playerPos.row + dRow;
+                const newCol = config.playerPos.col + dCol;
+                
+                // Check if new position is valid (within bounds and not a wall)
+                if (newRow >= 0 && newRow < config.rows && 
+                    newCol >= 0 && newCol < config.cols && 
+                    maze[newRow][newCol] === 0) {
+                    
+                    // Mark current cell as visited
+                    const cellKey = `${config.playerPos.row},${config.playerPos.col}`;
+                    config.visitedCells.add(cellKey);
+                    
+                    // Update player position and move count
+                    config.playerPos.row = newRow;
+                    config.playerPos.col = newCol;
+                    config.moves++;
+                    
+                    // Update stats
+                    updateStats();
+                    
+                    // Check if player reached the goal
+                    if (newRow === config.goalPos.row && newCol === config.goalPos.col) {
+                        clearInterval(config.timer);
+                        const timeTaken = Math.floor((Date.now() - config.startTime) / 1000);
+                        
+                        winMoves.textContent = config.moves;
+                        winTime.textContent = timeTaken + 's';
+                        winVisited.textContent = config.visitedCells.size;
+                        
+                        setTimeout(() => {
+                            winMessage.classList.remove('hidden');
+                            setTimeout(() => {
+                                winBox.classList.remove('scale-95', 'opacity-0');
+                                winBox.classList.add('scale-100', 'opacity-100');
+                            }, 10);
+                        }, 100);
+                    }
+                    
+                    renderMaze();
+                }
+            }
+        });
+    </script>
+</body>
+
+<body>
+    <div class="message">
+        <h1>Desktop Resolution Recommended</h1>
+        <p>This application is optimized for desktop resolutions. For the best experience, please access it on a desktop or laptop computer.</p>
+    </div>
+    <script>
+        function checkScreenSize() {
+            const message = document.querySelector('.message p');
+            if (window.innerWidth <= 768) {
+                message.textContent = 'This application is optimized for desktop resolutions. Please use a device with a larger screen for the best experience.';
+            } else {
+                message.textContent = 'This application is optimized for desktop resolutions. You are viewing it on a suitable device.';
+            }
+        }
+        window.addEventListener('resize', checkScreenSize);
+        window.addEventListener('load', checkScreenSize);
+    </script>
+</body>
+
+</html>
